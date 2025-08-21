@@ -1,0 +1,41 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>ThisObjectDoesNotExist</title>
+    <script src="https://cdn.jsdelivr.net/npm/@xenova/transformers@3.0.0/dist/transformers.min.js"></script>
+  </head>
+  <body style="margin:0;display:flex;align-items:center;justify-content:center;height:100vh;background:#000;">
+    <img id="out" alt="generated object">
+    <script>
+      let pipe;
+      async function init() {
+        if (pipe) return;
+        window.env = { BACKENDS: ["webgpu","wasm"], CACHE_DIR: "transformers-cache" };
+        const { pipeline } = window.transformers;
+        pipe = await pipeline("text-to-image", "stabilityai/sdxl-turbo");
+      }
+      async function generate() {
+        await init();
+        const result = await pipe("a random everyday object", {
+          width: 512, height: 512, num_inference_steps: 2, guidance_scale: 0.0
+        });
+        let url;
+        if (result.images) {
+          const img = result.images[0];
+          if (img instanceof HTMLImageElement) url = img.src;
+          else if (img instanceof ImageBitmap) {
+            const c = document.createElement("canvas");
+            c.width = img.width; c.height = img.height;
+            c.getContext("2d").drawImage(img,0,0);
+            const blob = await new Promise(r => c.toBlob(r,"image/png"));
+            url = URL.createObjectURL(blob);
+          } else if (img instanceof Blob) url = URL.createObjectURL(img);
+        }
+        if (!url && result.toDataURL) url = result.toDataURL();
+        document.getElementById("out").src = url;
+      }
+      generate();
+    </script>
+  </body>
+</html>
