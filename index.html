@@ -5,8 +5,8 @@
     <title>ThisObjectDoesNotExist</title>
     <script src="https://cdn.jsdelivr.net/npm/@xenova/transformers@3.0.0/dist/transformers.min.js"></script>
   </head>
-  <body style="margin:0;display:flex;align-items:center;justify-content:center;height:100vh;background:#000;">
-    <img id="out" alt="generated object">
+  <body style="margin:0;overflow:hidden;display:flex;align-items:center;justify-content:center;height:100vh;width:100vw;background:#000;">
+    <img id="out" alt="generated object" style="max-width:100%;max-height:100%;object-fit:contain;">
     <script>
       let pipe;
       async function init() {
@@ -20,20 +20,32 @@
         const result = await pipe("a random everyday object", {
           width: 512, height: 512, num_inference_steps: 2, guidance_scale: 0.0
         });
-        let url;
-        if (result.images) {
-          const img = result.images[0];
-          if (img instanceof HTMLImageElement) url = img.src;
-          else if (img instanceof ImageBitmap) {
+
+        let blob;
+        if (result && result.images && result.images[0]) {
+          const imgOut = result.images[0];
+          if (imgOut instanceof Blob) {
+            blob = imgOut;
+          } else if (imgOut instanceof ImageBitmap) {
             const c = document.createElement("canvas");
-            c.width = img.width; c.height = img.height;
-            c.getContext("2d").drawImage(img,0,0);
-            const blob = await new Promise(r => c.toBlob(r,"image/png"));
-            url = URL.createObjectURL(blob);
-          } else if (img instanceof Blob) url = URL.createObjectURL(img);
+            c.width = imgOut.width; c.height = imgOut.height;
+            c.getContext("2d").drawImage(imgOut,0,0);
+            blob = await new Promise(r => c.toBlob(r,"image/png"));
+          } else if (imgOut instanceof HTMLImageElement) {
+            const response = await fetch(imgOut.src);
+            blob = await response.blob();
+          }
+        } else if (result && result.toDataURL) {
+          const res = await fetch(result.toDataURL());
+          blob = await res.blob();
         }
-        if (!url && result.toDataURL) url = result.toDataURL();
-        document.getElementById("out").src = url;
+
+        if (blob) {
+          const url = URL.createObjectURL(blob);
+          document.getElementById("out").src = url;
+        } else {
+          document.getElementById("out").alt = "Generation failed";
+        }
       }
       generate();
     </script>
